@@ -24,16 +24,15 @@ namespace ImageService.Controller
                  { CommandEnum.NewFileCommand,new NewFileCommand(modal) }
             };
         }
-        public string ExecuteCommand(CommandEnum commandID, string[] args, out bool result)
+        public void ExecuteCommand(CommandEnum commandID, string[] args, out bool result)
         {
             result = false;
             ICommand cmd;
             if(commands.TryGetValue(commandID,out cmd))
             {
                 cmd.Execute(args,out result);
+                result = true;
             }
-            if (result == false) { return "Error: Command"+ commandID+" Execute has failed"; }
-            return "Command" + commandID + " has  Executed.";
      }
     }
 }

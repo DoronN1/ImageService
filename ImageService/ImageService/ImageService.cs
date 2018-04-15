@@ -15,6 +15,7 @@ using ImageService.Logging;
 using ImageService.Logging.Modal;
 using System.Configuration;
 using ImageService.Infrastructure;
+using ImageService.Controller.Handlers;
 
 namespace ImageService
 {
@@ -49,15 +50,13 @@ namespace ImageService
         private ImageServer m_imageServer;          // The Image Server
 		private IImageServiceModal modal;
 		private IImageController controller;
-        private EventLog eventLog;
         private ILoggingService logging;
-        private System.ComponentModel.IContainer components;
-        private int eventId = 1;
+        private EventLog eventLog;
+        private List<string> handlersPathList;
         #endregion
         public ImageService(string[] args)
         {
             InitializeComponent();
-
             string eventSourceName = ConfigurationManager.AppSettings["EventSource"];
             string logName = ConfigurationManager.AppSettings["ImageServiceLog"];
             if (args.Count() > 0)
@@ -80,12 +79,8 @@ namespace ImageService
         {
             this.eventLog = new System.Diagnostics.EventLog();
             ((System.ComponentModel.ISupportInitialize)(this.eventLog)).BeginInit();
-            // 
-            // ImageService
-            // 
             this.ServiceName = "ImageService";
             ((System.ComponentModel.ISupportInitialize)(this.eventLog)).EndInit();
-
         }
         [DllImport("advapi32.dll", SetLastError = true)]
         private static extern bool SetServiceStatus(IntPtr handle, ref ServiceStatus serviceStatus);
@@ -93,31 +88,32 @@ namespace ImageService
 
         public void OnTimer(object sender, System.Timers.ElapsedEventArgs args)
         {
-            // TODO: Insert monitoring activities here.  
-            eventLog.WriteEntry("Monitoring the System", EventLogEntryType.Information, eventId++);
+            //  monitoring activities .  
+            logging.Log("Monitoring the System", MessageTypeEnum.INFO);
         }
 
-        // Here You will Use the App Config!
         protected override void OnStart(string[] args)
         {
+          logging = new LoggingService( eventLog);
+          modal = new ImageServiceModal();
+          controller= new ImageController(modal);
+          handlersPathList =  ConfigurationManager.AppSettings["Handler"].Split(';').ToList();
+          m_imageServer = new ImageServer(controller,logging,handlersPathList);
             // Set up a timer to trigger every minute.  
             System.Timers.Timer timer = new System.Timers.Timer();
             timer.Interval = 60000; // 60 seconds  
             timer.Elapsed += new System.Timers.ElapsedEventHandler(this.OnTimer);
             timer.Start();
-
-            logging.Log("Start", MessageTypeEnum.INFO);
+             logging.Log("Start", MessageTypeEnum.INFO);
             // Update the service state to Start Pending. 
             ServiceStatus serviceStatus = new ServiceStatus();
             serviceStatus.dwCurrentState = ServiceState.SERVICE_START_PENDING;
             logging.Log("Start Pending", MessageTypeEnum.INFO);
             serviceStatus.dwWaitHint = 100000;
             SetServiceStatus(this.ServiceHandle, ref serviceStatus);
-   
             // Update the service state to Running.  
             serviceStatus.dwCurrentState = ServiceState.SERVICE_RUNNING;
             SetServiceStatus(this.ServiceHandle, ref serviceStatus);
-
         }
         protected override void OnContinue()
         {
@@ -125,9 +121,9 @@ namespace ImageService
         }
         protected override void OnStop()
         {
+            m_imageServer.sendCommand();
             logging.Log("Stop", MessageTypeEnum.INFO);
         }
-
 
     }
 }

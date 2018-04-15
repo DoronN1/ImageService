@@ -16,14 +16,26 @@ namespace ImageService.Server
         #region Members
         private IImageController controller;
         private ILoggingService logging;
-        Dictionary<int, string> dict;
+        private Dictionary<int, IDirectoryHandler> handlers;
         #endregion
 
         #region Properties
         public event EventHandler<CommandRecievedEventArgs> CommandRecieved; // The event that notifies about a new Command being recieved
         #endregion
 
-
+        public ImageServer(IImageController controller1, ILoggingService logging1,List<string> handlersPath)
+        {
+            controller = controller1;
+            logging = logging1;
+            handlers = new Dictionary<int, IDirectoryHandler> { };
+            // creates the handlers dictionary
+            int i = 0;
+        foreach (string s in handlersPath)
+            {
+                createHandler(s,i);
+                i++;
+            }
+        }
         /*********************************************************************/
 
         public void onCloseServer(object sender, DirectoryCloseEventArgs e)
@@ -36,16 +48,17 @@ namespace ImageService.Server
 
         public void sendCommand()
         {
-            CommandRecieved.Invoke(this,new CommandRecievedEventArgs());
+            CommandRecievedEventArgs Com = new CommandRecievedEventArgs(1, null, "*");
+            CommandRecieved?.Invoke(this, Com);
         }
         /*********************************************************************/
 
-        public void createHandler(string directory)
+        public void createHandler(string directory,int handler_num)
         {
-            IDirectoryHandler h = new DirectoyHandler(directory);
+            IDirectoryHandler h = new DirectoyHandler(directory,controller,logging);
+            handlers.Add(handler_num, h);
             CommandRecieved += h.OnCommandRecieved;
-            h.DirectoryClose += onCloseServer; ;
-
+            h.DirectoryClose += onCloseServer; 
         }
     }
 }
