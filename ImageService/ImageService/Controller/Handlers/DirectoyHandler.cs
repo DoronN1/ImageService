@@ -24,18 +24,18 @@ namespace ImageService.Controller.Handlers
         #region Members
         private IImageController m_controller;              // The Image Processing Controller
         private ILoggingService m_logging;
-        private FileSystemWatcher m_dirWatcher;             // The Watcher of the Dir
+        private FileSystemWatcher watcher;             // The Watcher of the Dir
         private string m_path;                              // The Path of directory
         public ImageServiceModal ism;
-        FileSystemWatcher watcher = new FileSystemWatcher();
 
         #endregion
 
         public event EventHandler<DirectoryCloseEventArgs> DirectoryClose; // The Event That Notifies that the Directory is being closed
 
-        public DirectoyHandler(string directory)
+        public DirectoyHandler(string directory,IImageController controller)
         {
             this.m_path = directory;
+            this.m_controller = controller;
         }
         /*********************************************************************/
 
@@ -61,8 +61,22 @@ namespace ImageService.Controller.Handlers
 
         /*********************************************************************/
         // Define the event handlers.
-        private static void OnChanged(object source, FileSystemEventArgs e)
+        private void OnChanged(object source, FileSystemEventArgs e)
         {
+
+            bool result;
+            FileInfo file = new FileInfo(e.FullPath);
+            //send command to controller to add a file
+            string[] args = { e.FullPath, file.Name };
+            if (m_controller.ExecuteCommand(CommandEnum.NewFileCommand, args, out result) == true)
+            {
+                //notify logger
+                m_logging.Log("added file succesfully", MessageTypeEnum.INFO);
+            }
+
+            //notify logger
+            m_logging.Log("ERROR: faild to add file", MessageTypeEnum.INFO);
+
             // Specify what is done when a file is changed, created, or deleted.
             Console.WriteLine("File: " + e.FullPath + " " + e.ChangeType);
         }
@@ -72,17 +86,12 @@ namespace ImageService.Controller.Handlers
             Console.WriteLine("File: {0} renamed to {1}", e.OldFullPath, e.FullPath);
         }
 
-        public void OnCloseServer()
-        {
-
-        }
-
         /*********************************************************************/
         //check if command is meant for its directory, if yes – handle command(for now will just be to close handler)
 
         public CommandRecievedEventArgs onCommandReceived(object sender, CommandRecievedEventArgs e)
         {
-            if (m_dirWatcher.Path.CompareTo(e.RequestDirPath) == 0)
+            if (watcher.Path.CompareTo(e.RequestDirPath) == 0)
             {
                 closeHandler(e.RequestDirPath);
             }
@@ -94,31 +103,14 @@ namespace ImageService.Controller.Handlers
         public void closeHandler(string path)
         {
             //– close FileSystemWatcher and invoke onClose event
-            m_dirWatcher.EnableRaisingEvents = false;
+            watcher.EnableRaisingEvents = false;
             DirectoryClose.Invoke(this, new DirectoryCloseEventArgs(path, "Directory Closed"));
         }
 
 
 
         /*********************************************************************/
-        public void createDateFolder(RenamedEventArgs e)
-        {
-            string result;
-
-            string pathOut = ConfigurationManager.AppSettings["OutputDir"];
-            //add image
-            string pathOrigin = ism.AddFile(pathOut + e.OldFullPath, out result);
-
-            //notify logger
-            m_logging.Log("created outputDir directory", MessageTypeEnum.INFO);
-
-            /*for thumbnails directory*/
-            ism.createFolder(pathOut, "Tumbnails", out result);
-            string path = ism.AddFile(pathOut + "/Tumbnails", out result);
-
-            //notify logger
-            m_logging.Log("created thumbnail directory", MessageTypeEnum.INFO);
-        }
+       
 
     }
 }

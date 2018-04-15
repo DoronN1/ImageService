@@ -17,34 +17,115 @@ namespace ImageService.Modal
     {
         #region Members
         private string m_OutputFolder;            // The Output Folder
+        private string m_TumbnailFolder;        // The Output Folder/Tumbnails
         private int m_thumbnailSize;              // The Size Of The Thumbnail Size
         #endregion
-
+        /**************************************************************************/
         public ImageServiceModal()
         {
             m_thumbnailSize = int.Parse(ConfigurationManager.AppSettings["ThumbnailSize"]);
+            m_OutputFolder = ConfigurationManager.AppSettings["OutputDir"];
+            m_TumbnailFolder = System.IO.Path.Combine(m_OutputFolder, "Tumbnails");
+            // creates the tumbnail folder on creation.
+            bool result = false;
+            createFolder(m_TumbnailFolder, out result);
         }
-
-        public string AddFile(string path, out bool result)
+        /**************************************************************************/
+        public string AddFile(string srcPath,string fileName ,out bool result)
         {
-            string dirYearPath = path + GetDateTakenFromImage(path).Year.ToString();
-            if (!Directory.Exists(dirYearPath))
+            result = false;
+            bool tumbResult = false;
+            string srcFilePath = System.IO.Path.Combine(srcPath, fileName);
+            string dirYearPath = System.IO.Path.Combine(m_OutputFolder, GetDateTakenFromImage(srcFilePath).Year.ToString());
+            string dirMonthPath = System.IO.Path.Combine(dirYearPath, GetDateTakenFromImage(srcFilePath).Month.ToString());
+            string dirTumbYearPath = System.IO.Path.Combine(m_TumbnailFolder, GetDateTakenFromImage(srcFilePath).Year.ToString());
+            string dirTumbMonthPath = System.IO.Path.Combine(dirTumbYearPath, GetDateTakenFromImage(srcFilePath).Month.ToString());
+            string newFilePath = System.IO.Path.Combine(dirMonthPath, fileName);
+            string newTumbFilePath = System.IO.Path.Combine(dirTumbMonthPath, fileName);
+            // creates the year folder and Tumbnail/year folder
+                createFolder(dirYearPath, out result);
+                createFolder(dirTumbYearPath, out tumbResult);
+                if ((result == false)||(tumbResult==false))
+                {
+                                return "Error: create year Folder has failed.";
+                }
+            // creates the month folder and Tumbnail/year/month folder
+            createFolder(dirYearPath, out result);
+                createFolder(dirTumbMonthPath, out tumbResult);
+                if ((result == false)|| (tumbResult == false))
+                {
+                    return "Error: create month Folder has failed.";
+                }
+            // copy the image into OutPutDir/Tumbnail/year/month and resize into Tumbnail
+            copyFile(srcFilePath, newTumbFilePath, out tumbResult);
+            createTumbnail(newTumbFilePath);
+            // move the image into OutPutDir/year/month
+            moveFile(srcFilePath, newFilePath, out result);
+            if ((result == false)|| (tumbResult == false))
             {
-                createFolder(path, GetDateTakenFromImage(path).Year.ToString(), out result);
+                return "Error: moving file has failed.";
             }
-            string dirMonthPath = dirYearPath + GetDateTakenFromImage(path).Month.ToString();
-            if (!Directory.Exists(dirMonthPath))
-            {
-                createFolder(dirYearPath, GetDateTakenFromImage(path).Month.ToString(), out result);
-            }
-
-            moveFile(path, dirMonthPath, out result);
-
-            dirMonthPath = path;
-            return result;
+            result = true;
+            return  dirMonthPath;
         }
+        /**************************************************************************/
+        public void createFolder(string folderPath, out bool result)
+        {
+            result = false;
+            if (!Directory.Exists(folderPath))
+            {
+                // Create the subfolder.
+                try
+                {
+                    System.IO.Directory.CreateDirectory(folderPath);
+                    result = true;
+                }
+                catch (System.IO.IOException e)
+                {
+                    Console.WriteLine(e.Message);
+                }
+            }
+        }
+        /**************************************************************************/
+        public void moveFile(string SourcePath, string DestPath, out bool result)
+        {
+            // move a file to a new location:
+            result = false;
+            if (System.IO.File.Exists(SourcePath))
+            {
+                try
+                {
+                    System.IO.File.Move(SourcePath, DestPath);
+                    result = true;
+                }
+                catch (System.IO.IOException e)
+                {
+                    Console.WriteLine(e.Message);
+                }
+            }
 
+        }
+        /**************************************************************************/
+        public void copyFile(string sourceFile, string destFile, out bool result)
+        {
+            result = false;
+            // To copy a file to another location and 
+            // overwrite the destination file if it already exists.
+            if (System.IO.File.Exists(sourceFile))
+            {
+                try
+                {
+                    System.IO.File.Copy(sourceFile, destFile, true);
+                    result = true;
+                }
+                catch (System.IO.IOException e)
+                {
+                    Console.WriteLine(e.Message);
+                }
+            }
 
+        }
+        /**************************************************************************/
         private static Regex r = new Regex(":");
 
         //retrieves the datetime WITHOUT loading the whole image
@@ -59,95 +140,102 @@ namespace ImageService.Modal
             }
         }
 
-        public string createFolder(string path, string folderName, out string result)
+        /**************************************************************************/
+        public void copyFolder(string sourceFolder, string destFolder, out bool result)
         {
-            string pathString = System.IO.Path.Combine(path, folderName);
-
-            // Create the subfolder. You can verify in File Explorer that you have this
-            System.IO.Directory.CreateDirectory(pathString);
-            result = path;
-            return result;
-        }
-
-        public string copyFile(string sourceFile, string destFile, out string result)
-        {
-            // To copy a file to another location and 
-            // overwrite the destination file if it already exists.
-            System.IO.File.Copy(sourceFile, destFile, true);
-            result = destFile;
-            return result;
-        }
-
-        public string copyFolder(string path, string fileName, out string result)
-        {
-            string sourcePath = @"C:\Users\Public\TestFolder";
-            string targetPath = @"C:\Users\Public\TestFolder\SubDir";
-
-            // Use Path class to manipulate file and directory paths.
-            string sourceFile = System.IO.Path.Combine(sourcePath, fileName);
-            string destFile = System.IO.Path.Combine(targetPath, fileName);
-
+            result = false;
             // To copy a folder's contents to a new location:
-            // Create a new target folder, if necessary.
-            if (!System.IO.Directory.Exists(targetPath))
+            if (Directory.Exists(sourceFolder))
             {
-                System.IO.Directory.CreateDirectory(targetPath);
+                // Create a new target folder, if necessary.
+                if (!Directory.Exists(destFolder))
+                {
+                    createFolder(destFolder, out  result);
+                }
+                    // Create all of the directories
+                    foreach (string dirPath in Directory.GetDirectories(sourceFolder, "*",
+                                SearchOption.AllDirectories))
+                    {
+                        Directory.CreateDirectory(dirPath.Replace(sourceFolder, destFolder));
+                    }
+                    //Copy all the files & Replaces any files with the same name
+                    foreach (string newPath in Directory.GetFiles(sourceFolder, "*.*",
+                        SearchOption.AllDirectories))
+                    {
+                        File.Copy(newPath, newPath.Replace(sourceFolder, destFolder), true);
+                    }
+                result = true;
             }
-            result = targetPath;
-            return result;
-
         }
+        /**************************************************************************/
 
-        public string moveFile(string SourcePath, string DestPath, out string result)
+
+        public void moveFolder(string SourcePath, string DestPath, out bool result)
         {
             // To move a file or folder to a new location:
-            if (!File.Exists(DestPath))
-                System.IO.File.Move(SourcePath, DestPath);
-            result = DestPath;
-            return result;
-        }
-
-        public string moveFolder(string SourcePath, string DestPath, out string result)
-        {
-            // To move a file or folder to a new location:
-            System.IO.File.Move(SourcePath, DestPath);
-            result = DestPath;
-            return result;
-        }
-
-
-        public string deleteFile(string SourcePath, string DestPath, out string result)
-        {
-            // Delete a file by using File class static method...
-            if (System.IO.File.Exists(@"C:\Users\Public\DeleteTest\test.txt"))
+            result = false;
+            if (System.IO.File.Exists(SourcePath))
             {
                 try
                 {
-                    System.IO.File.Delete(@"C:\Users\Public\DeleteTest\test.txt");
+                    System.IO.File.Move(SourcePath,  DestPath);
+                    result = true;
                 }
                 catch (System.IO.IOException e)
                 {
                     Console.WriteLine(e.Message);
-
                 }
             }
-            result = DestPath;
-            return result;
         }
+        /**************************************************************************/
 
-        public string deleteFolder(string SourcePath, string DestPath, out string result)
+        public void deleteFile(string SourcePath, out bool result)
         {
+            // Delete a file by using File class static method...
+            result = false;
+            if (System.IO.File.Exists(SourcePath))
+            {
+                try
+                {
+                    System.IO.File.Delete(SourcePath);
+                    result = true;
+                }
+                catch (System.IO.IOException e)
+                {
+                    Console.WriteLine(e.Message);
+                }
+            }
+        }
+        /**************************************************************************/
+        public void deleteFolder(string SourcePath,out bool result)
+        {
+            result = false;
             // Delete a directory. Must be writable or empty.
-            try
+            if (System.IO.File.Exists(SourcePath))
             {
-                System.IO.Directory.Delete(@"C:\Users\Public\DeleteTest");
+                try
+                {
+                    //delete all the files in folder
+                    foreach (string newPath in Directory.GetFiles(SourcePath, "*.*",
+                        SearchOption.AllDirectories))
+                    {
+                        System.IO.File.Delete(newPath);
+                                      }
+                    System.IO.Directory.Delete(SourcePath);
+                    result = true;
+                }
+                catch (System.IO.IOException e)
+                {
+                    Console.WriteLine(e.Message);
+                }
             }
-            catch (System.IO.IOException e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            result = DestPath;
-            return result;
-        }    
+        }
+        /**************************************************************************/
+        public void createTumbnail(string imagePath)
+        {
+            Image image = Image.FromFile(imagePath);
+            Image thumb = image.GetThumbnailImage(m_thumbnailSize, m_thumbnailSize, () => false, IntPtr.Zero);
+            thumb.Save(Path.ChangeExtension(imagePath, "thumb"));
+        }
     }
 }

@@ -13,23 +13,28 @@ namespace ImageService.Controller
     public class ImageController : IImageController
     {
         private IImageServiceModal m_modal;                      // The Modal Object
-        private Dictionary<int, ICommand> commands;
+        private Dictionary<CommandEnum, ICommand> commands;
 
         public ImageController(IImageServiceModal modal)
         {
             m_modal = modal;                    // Storing the Modal Of The System
-            commands = new Dictionary<int, ICommand>()
+            commands = new Dictionary<CommandEnum, ICommand>()
             {
 				// For Now will contain NEW_FILE_COMMAND
-                 { 770,new NewFileCommand(modal) }
+                 { CommandEnum.NewFileCommand,new NewFileCommand(modal) }
             };
         }
-        public string ExecuteCommand(int commandID, string[] args, out bool resultSuccesful)
+        public string ExecuteCommand(CommandEnum commandID, string[] args, out bool result)
         {
-            resultSuccesful = true;
-            string str = "dsa";
-           return str;
-        }
+            result = false;
+            ICommand cmd;
+            if(commands.TryGetValue(commandID,out cmd))
+            {
+                cmd.Execute(args,out result);
+            }
+            if (result == false) { return "Error: Command"+ commandID+" Execute has failed"; }
+            return "Command" + commandID + " has  Executed.";
+     }
     }
 }
 ;

@@ -26,28 +26,26 @@ namespace ImageService.Server
 
         /*********************************************************************/
 
-        public void onCloseServer(object sender, ... )
+        public void onCloseServer(object sender, DirectoryCloseEventArgs e)
         {
-            IDirectoryHandler h = sender;
+            IDirectoryHandler h = sender as IDirectoryHandler;
             CommandRecieved -= h.OnCommandRecieved;
-            CommandRecieved -= h.OnCloseServer;
         }
 
         /*********************************************************************/
 
         public void sendCommand()
         {
-            CommandRecieved("*", CloseHandler());
+            CommandRecieved.Invoke(this,new CommandRecievedEventArgs());
         }
         /*********************************************************************/
 
         public void createHandler(string directory)
         {
-            IDirectoryHandler h = new DirectoryHandler(directory);
+            IDirectoryHandler h = new DirectoyHandler(directory);
             CommandRecieved += h.OnCommandRecieved;
-            h.OnCloseServer += onCloseServer;
+            h.DirectoryClose += onCloseServer; ;
 
         }
-
     }
 }
